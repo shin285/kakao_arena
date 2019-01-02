@@ -30,6 +30,3 @@ def get_data(path):
 
 
 get_data("D:/data/kakao_arena")
-
-
-shin0614#!32
