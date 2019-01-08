@@ -1,45 +1,108 @@
-from operator import itemgetter
-
-import numpy as np
-from collections import Counter, OrderedDict
 import h5py
+import json
+import random
 
-bid_counts = dict()
+
+# 각 분류 별 classifier 구현
+
+# 카테고리 별로 8:2 비율로 나눔
+# 각 데이터를 읽으면서 20% 확률로 validation data로 assign
+
+def convert_utf8(x):
+    return x.decode('UTF-8').strip()
 
 
-def get_ids(id_data):
-    id_data_len = len(id_data)
-    print("total len : ", id_data_len)
-    from_idx = 0
-    to_idx = min(id_data_len, from_idx + 100000)
+def split_data(path):
+    filename_list = [path + "/train.chunk.0" + str(i) for i in range(1, 10)]
+    data_list = []
+    for filename in filename_list:
+        print(filename)
+        data = h5py.File(filename, 'r')
+        # bcateid = data['train/bcateid'].value[:22]
+        # mcateid = data['train/mcateid'].value[:22]
+        # scateid = data['train/scateid'].value[:22]
+        # dcateid = data['train/dcateid'].value[:22]
+        #
+        # model = data['train/model'].value[:22]
+        # brand = data['train/brand'].value[:22]
+        # maker = data['train/maker'].value[:22]
+
+        bcateid = data['train/bcateid'].value[:]
+        mcateid = data['train/mcateid'].value[:]
+        scateid = data['train/scateid'].value[:]
+        dcateid = data['train/dcateid'].value[:]
+
+        model = data['train/model'].value[:]
+        brand = data['train/brand'].value[:]
+        maker = data['train/maker'].value[:]
+
+        data_list.extend(list(zip(bcateid, mcateid, scateid, dcateid, model, brand, maker)))
+
+    total_len = len(data_list)
+    validation_idx = total_len // 5
+
+    return data_list[validation_idx:], data_list[:validation_idx]
+
+
+def read_h5py(filename):
+    data = h5py.File(filename, 'r')
+    print(data['train/bcateid'].value[:])
+    print(data['train/mcateid'].value[:])
+    data.close()
+
+
+# validation generator
+
+# training generator
+
+
+def yield_test(target_list):
+    i = 0
     while True:
-        id_values = id_data.value[from_idx:to_idx]
-        for i in id_values:
-            bid_counts[i] = bid_counts.get(i, 0) + 1
-        print(from_idx, ":", to_idx)
-        print(id_values)
-        if id_data_len == to_idx:
+        yield target_list[i]
+        i += 1
+        if not i < len(target_list):
             break
-        from_idx = from_idx + 100000
-        to_idx = from_idx + min(id_data_len - from_idx, 100000)
+
+
+def load_category_info(path):
+    with open(path) as f:
+        data = json.load(f)
+    return data
+
+
+def data_generator(data, batch_size=256):
+    data_len = len(data)
+    from_idx = 0
+    to_idx = min(data_len, from_idx + batch_size)
+    while True:
+        values = data.value[from_idx:to_idx]
+
+        # todo yield values
+
+        if data_len == to_idx:
+            break
+        from_idx = from_idx + batch_size
+        to_idx = from_idx + min(data_len - from_idx, batch_size)
 
 
 def load_to_list(filenames):
     for filename in filenames:
         print(filename)
         data = h5py.File(filename, 'r')
+        brand_data = data['train/bcateid']
+        print(brand_data.value[:])
         train = data['train']
+        bcate_id_dic = data_generator(train['bcateid'])
 
-        bcate_id_dic = get_ids(train['bcateid'])
-        print()
+        brand_data = train['brand']
+        model_data = train['model']
+        maker_data = train['maker']
 
-        # brand_data = train['brand']
-        # maker_data = train['maker']
         bcate_ids = train['bcateid']
-        # print(bcate_ids.value[0])
-        # mcate_ids = train['mcateid']
-        # scate_ids = train['scateid']
-        # dcate_ids = train['dcateid']
+        mcate_ids = train['mcateid']
+        scate_ids = train['scateid']
+        dcate_ids = train['dcateid']
 
         # train_keys = train.keys()
         #
@@ -64,12 +127,29 @@ def get_data(path):
     total_data_list = load_to_list(filenames)
 
 
-get_data("D:/data/kakao_arena")
+# get_data('D:\data\kakao_arena')
 
-import matplotlib.pyplot as plt
 
-print(bid_counts)
-aa = {k: v for k, v in sorted(bid_counts.items(), key=lambda x: x[1])}
+def multiple_yield_test():
+    first_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    second_list = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+    first_generator = yield_test(first_list)
+    second_generator = yield_test(first_list)
+    while True:
+        yield next(first_generator), next(second_generator)
 
-plt.bar(list(aa.keys()), aa.values(), color='b')
-plt.show()
+
+# g = multiple_yield_test()
+#
+# while True:
+#     print(next(g))
+
+
+
+# # split data to training data and validation data
+# training_data, validation_data = split_data('D:\data\kakao_arena')
+#
+#
+#
+# print(len(training_data))
+# print(len(validation_data))
